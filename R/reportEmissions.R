@@ -118,7 +118,7 @@ reportEmissions <- function(gdx, storageWood = TRUE) {
       emisBuildingNet     <- collapseNames(emisBuildingInflow + emisBuildingOutflow)
 
       # Adjust top-categories
-      eLanduseChange <- eLanduseChange + emisWoodNet + emisBuildingNet
+      eLanduseChange <- eLanduseChange + emisWoodInflow + emisBuildingInflow
       totalNetFlux   <- eLanduseChange + eClimateChange
 
     } else {
