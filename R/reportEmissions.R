@@ -74,10 +74,12 @@
 #' Emissions\|CO2\|Land\|Land-use Change\|+\|Timber | Mt CO2/yr | Net CO2 flux from harvested wood products (storage minus release)
 #' Emissions\|CO2\|Land\|Land-use Change\|Timber\|+\|Storage in HWP | Mt CO2/yr | CO2 stored in harvested wood products (negative values)
 #' Emissions\|CO2\|Land\|Land-use Change\|Timber\|+\|Release from HWP | Mt CO2/yr | CO2 released from decay of harvested wood products
-#' Emissions\|CO2\|Land\|Land-use Change\|+\|Legacy clearing | Mt CO2/yr | REPORTING REFRAME (only when legacyEmis=TRUE): net correction spreading the instantaneous aboveground clearing pulse (deforestation + other-land conversion) over a slash/deadwood decay tail, mirroring the HWP convolution. Added on top of the raw Deforestation/Other-land-conversion lines, which stay at 100 percent instantaneous.
-#' Emissions\|CO2\|Land\|Land-use Change\|Legacy clearing\|+\|Storage | Mt CO2/yr | Clearing carbon deferred into the slash/deadwood pool this year (negative = withdrawal from the instantaneous flux)
-#' Emissions\|CO2\|Land\|Land-use Change\|Legacy clearing\|+\|Release | Mt CO2/yr | Clearing carbon released from decay of the slash/deadwood pool (positive)
+#' Emissions\|CO2\|Land\|Land-use Change\|+\|Legacy clearing | Mt CO2/yr | REPORTING REFRAME: net correction spreading the instantaneous aboveground clearing pulse (deforestation + other-land conversion) over a slash/deadwood decay tail, mirroring the HWP convolution. Added on top of the raw Deforestation/Other-land-conversion lines, which stay at 100 percent instantaneous. Always reported; exactly zero when legacyEmis=FALSE.
+#' Emissions\|CO2\|Land\|Land-use Change\|Legacy clearing\|+\|Storage | Mt CO2/yr | Clearing carbon deferred into the slash/deadwood pool this year (strictly <= 0, a withdrawal from the instantaneous flux). Always reported; zero when legacyEmis=FALSE.
+#' Emissions\|CO2\|Land\|Land-use Change\|Legacy clearing\|+\|Release | Mt CO2/yr | Clearing carbon released from decay of the slash/deadwood pool (strictly >= 0). Always reported; zero when legacyEmis=FALSE.
 #' Emissions\|CO2\|Land\|Land-use Change\|Excl Legacy clearing | Mt CO2/yr | Net CO2 flux from land-use change excluding the legacy-clearing reframe: the raw instantaneous accounting, equal to the legacyEmis=FALSE value of +\|Land-use Change (non-additive memo; only when legacyEmis=TRUE)
+#' Emissions\|CO2\|Land\|Land-use Change\|Gross Positive | Mt CO2/yr | Gross source of the LUC-CO2 flux: all positive process contributions summed (non-additive memo; net = Gross Positive + Gross Negative). Mirrors ScenarioMIP Gross Emissions (Land part).
+#' Emissions\|CO2\|Land\|Land-use Change\|Gross Negative | Mt CO2/yr | Gross sink of the LUC-CO2 flux: all negative process contributions summed (non-additive memo). Mirrors ScenarioMIP Gross Removals (Land part).
 #' Emissions\|CO2\|Land\|Land-use Change\|+\|Residual | Mt CO2/yr | Residual CO2 flux not captured in other categories
 #' Emissions\|CO2\|Land\|Land-use Change\|Residual\|+\|Positive | Mt CO2/yr | Positive residual CO2 flux
 #' Emissions\|CO2\|Land\|Land-use Change\|Residual\|+\|Negative | Mt CO2/yr | Negative residual CO2 flux
@@ -106,9 +108,11 @@
 #' Emissions\|CO2\|Land\|Cumulative\|Land-use Change\|+\|Soil | Gt CO2 | Cumulative net CO2 flux from soil
 #' Emissions\|CO2\|Land\|Cumulative\|Land-use Change\|+\|Wood Harvest | Gt CO2 | Cumulative CO2 emissions from wood harvest
 #' Emissions\|CO2\|Land\|Cumulative\|Land-use Change\|+\|Timber | Gt CO2 | Cumulative net CO2 flux from harvested wood products
-#' Emissions\|CO2\|Land\|Cumulative\|Land-use Change\|+\|Legacy clearing | Gt CO2 | Cumulative legacy clearing correction (only when legacyEmis=TRUE)
+#' Emissions\|CO2\|Land\|Cumulative\|Land-use Change\|+\|Legacy clearing | Gt CO2 | Cumulative legacy clearing correction. Always reported; zero when legacyEmis=FALSE.
 #' Emissions\|CO2\|Land\|Cumulative\|Land-use Change\|Excl Legacy clearing | Gt CO2 | Cumulative net CO2 flux from land-use change excluding the legacy reframe (non-additive memo; only when legacyEmis=TRUE)
 #' Emissions\|CO2\|Land\|Cumulative\|Land-use Change\|+\|Residual | Gt CO2 | Cumulative residual CO2 flux
+#' Emissions\|CO2\|Land\|Cumulative\|Land-use Change\|Gross Positive | Gt CO2 | Cumulative gross source of the LUC-CO2 flux (non-additive memo; net = Gross Positive + Gross Negative)
+#' Emissions\|CO2\|Land\|Cumulative\|Land-use Change\|Gross Negative | Gt CO2 | Cumulative gross sink of the LUC-CO2 flux (non-additive memo)
 #'
 #' @section N2O emissions variables:
 #' Name | Unit | Meta
@@ -339,8 +343,8 @@ reportEmissions <- function(gdx, level = "regglo", storageWood = TRUE, legacyEmi
 
     # Legacy clearing-tail emissions (reporting reframe): spread the instantaneous aboveground
     # clearing pulse (Deforestation + Other land conversion) over a first-order-decay slash/deadwood
-    # pool, mirroring the HWP convolution. Gated; default OFF => legacy* are zero and neither
-    # eLanduseChange nor totalNetFlux change (bit-identical output).
+    # pool, mirroring the HWP convolution. Gated on legacyEmis (default TRUE = reframe on); when FALSE,
+    # legacy* are zero and neither eLanduseChange nor totalNetFlux change (raw instantaneous accounting).
     if (legacyEmis) {
       emisLegacy <- legacyEmissions(gdx, level = level, unit = "gas",
                                     cumulative = .cumulative)[, getYears(totalNetFlux), ]
@@ -660,19 +664,21 @@ reportEmissions <- function(gdx, level = "regglo", storageWood = TRUE, legacyEmi
 
   }
 
-  # Legacy clearing-tail lines (only emitted when legacyEmis = TRUE, so default output is
-  # bit-identical)
+  # Legacy clearing-tail lines. Net + Storage + Release are ALWAYS emitted (exactly zero when
+  # legacyEmis = FALSE) so downstream consumers that map these variables - the REMIND coupling and the
+  # mrcommons land-CO2 baseline - find them regardless of the flag and never break on a missing variable.
+  emissionsReport <- with(yearlyCO2, mbind(
+    emissionsReport,
+    setNames(legacyNet,     "Emissions|CO2|Land|Land-use Change|+|Legacy clearing (Mt CO2/yr)"),
+    setNames(legacyStorage, "Emissions|CO2|Land|Land-use Change|Legacy clearing|+|Storage (Mt CO2/yr)"),
+    setNames(legacyRelease, "Emissions|CO2|Land|Land-use Change|Legacy clearing|+|Release (Mt CO2/yr)")
+  ))
+  # Land-use Change EXCLUDING the legacy reframe (non-additive memo, no "+"): the raw instantaneous
+  # accounting (= total minus the Legacy clearing child). Only meaningful when the reframe is on, so gated;
+  # under legacyEmis = FALSE it would just equal +|Land-use Change.
   if (legacyEmis) {
-    emissionsReport <- with(yearlyCO2, mbind(
-      emissionsReport,
-      setNames(legacyNet,     "Emissions|CO2|Land|Land-use Change|+|Legacy clearing (Mt CO2/yr)"),
-      setNames(legacyStorage, "Emissions|CO2|Land|Land-use Change|Legacy clearing|+|Storage (Mt CO2/yr)"),
-      setNames(legacyRelease, "Emissions|CO2|Land|Land-use Change|Legacy clearing|+|Release (Mt CO2/yr)"),
-      # Land-use Change EXCLUDING the legacy reframe (non-additive memo, no "+"): the raw instantaneous
-      # accounting, identical to the legacyEmis=FALSE value of +|Land-use Change (= total minus the
-      # Legacy clearing child). Lets plots compare the reframed and raw LUC-CO2 from a single report.
-      setNames(eLanduseChange - legacyNet, "Emissions|CO2|Land|Land-use Change|Excl Legacy clearing (Mt CO2/yr)")
-    ))
+    emissionsReport <- with(yearlyCO2, mbind(emissionsReport,
+      setNames(eLanduseChange - legacyNet, "Emissions|CO2|Land|Land-use Change|Excl Legacy clearing (Mt CO2/yr)")))
   }
 
   # Other planted forest is an optional forestry pool: when the gdx separates it from timber
@@ -705,11 +711,44 @@ reportEmissions <- function(gdx, level = "regglo", storageWood = TRUE, legacyEmi
                                     "Emissions|CO2|Land|Land-use Change|+|Residual (Mt CO2/yr)",
                                     "Emissions|CO2|Land|Land-use Change|+|Timber (Mt CO2/yr)",
                                     "Emissions|CO2|Land|Land-use Change|+|Wood Harvest (Mt CO2/yr)",
-                                    if (legacyEmis) "Emissions|CO2|Land|Land-use Change|+|Legacy clearing (Mt CO2/yr)")], dim = 3)
+                                    "Emissions|CO2|Land|Land-use Change|+|Legacy clearing (Mt CO2/yr)")], dim = 3)
 
   if (any(abs(checkEmis) > 1e-03, na.rm = TRUE)) {
       warning("CO2 emission sub-categories do not add up to total")
   }
+
+  # Gross Positive (gross source) and Gross Negative (gross sink) of the LUC-CO2 flux, as non-additive memos:
+  # each is an INDEPENDENT sum of its signed process children, mirroring the REMIND co2luc Pos/Neg split. Keeping
+  # them independent (rather than deriving Positive = net - Negative) makes Gross Positive + Gross Negative = net
+  # a real consistency check - a child added to the report but left unclassified breaks it, so the inconsistency
+  # is caught in magpie4 (see the Gross-partition test) instead of only surfacing downstream in REMIND. Matches
+  # the ScenarioMIP Gross Emissions / Gross Removals (Land-use Change part).
+  grossPosVars <- c("Emissions|CO2|Land|Land-use Change|+|Deforestation (Mt CO2/yr)",
+                    "Emissions|CO2|Land|Land-use Change|+|Forest degradation (Mt CO2/yr)",
+                    "Emissions|CO2|Land|Land-use Change|+|Other land conversion (Mt CO2/yr)",
+                    "Emissions|CO2|Land|Land-use Change|+|Wood Harvest (Mt CO2/yr)",
+                    "Emissions|CO2|Land|Land-use Change|Peatland|+|Positive (Mt CO2/yr)",
+                    "Emissions|CO2|Land|Land-use Change|Residual|+|Positive (Mt CO2/yr)",
+                    "Emissions|CO2|Land|Land-use Change|Soil|++|Emissions (Mt CO2/yr)",
+                    "Emissions|CO2|Land|Land-use Change|Timber|+|Release from HWP (Mt CO2/yr)",
+                    "Emissions|CO2|Land|Land-use Change|Legacy clearing|+|Release (Mt CO2/yr)")
+  grossNegVars <- c("Emissions|CO2|Land|Land-use Change|+|Regrowth (Mt CO2/yr)",
+                    "Emissions|CO2|Land|Land-use Change|Peatland|+|Negative (Mt CO2/yr)",
+                    "Emissions|CO2|Land|Land-use Change|Residual|+|Negative (Mt CO2/yr)",
+                    "Emissions|CO2|Land|Land-use Change|Soil|++|Withdrawals (Mt CO2/yr)",
+                    "Emissions|CO2|Land|Land-use Change|Timber|+|Storage in HWP (Mt CO2/yr)",
+                    "Emissions|CO2|Land|Land-use Change|Legacy clearing|+|Storage (Mt CO2/yr)")
+  grossPos <- dimSums(emissionsReport[, , grossPosVars], dim = 3)
+  grossNeg <- dimSums(emissionsReport[, , grossNegVars], dim = 3)
+  # consistency check (like checkEmis above): the source + sink children must partition the net LUC flux
+  grossCheck <- emissionsReport[, , "Emissions|CO2|Land|+|Land-use Change (Mt CO2/yr)"] -
+    dimSums(emissionsReport[, , c(grossPosVars, grossNegVars)], dim = 3)
+  if (any(abs(grossCheck) > 1e-03, na.rm = TRUE)) {
+    warning("Gross Positive and Gross Negative do not add up to net Land-use Change")
+  }
+  emissionsReport <- mbind(emissionsReport,
+    setNames(grossPos, "Emissions|CO2|Land|Land-use Change|Gross Positive (Mt CO2/yr)"),
+    setNames(grossNeg, "Emissions|CO2|Land|Land-use Change|Gross Negative (Mt CO2/yr)"))
 
   # nolint end
 
@@ -845,6 +884,8 @@ reportEmissions <- function(gdx, level = "regglo", storageWood = TRUE, legacyEmi
 
     # Gross emissions - Peatland
     setNames(peatland,                            "Emissions|CO2|Land|Cumulative|Land-use Change|+|Peatland (Gt CO2)"),
+    setNames(peatland_pos,                        "Emissions|CO2|Land|Cumulative|Land-use Change|Peatland|+|Positive (Gt CO2)"),
+    setNames(peatland_neg,                        "Emissions|CO2|Land|Cumulative|Land-use Change|Peatland|+|Negative (Gt CO2)"),
 
     # Land-use Change EXCLUDING peat (non-additive memo, no "+") - cumulative counterpart of the yearly line
     setNames(eLanduseChange - peatland,           "Emissions|CO2|Land|Cumulative|Land-use Change|Excl Peatland (Gt CO2)"),
@@ -879,6 +920,8 @@ reportEmissions <- function(gdx, level = "regglo", storageWood = TRUE, legacyEmi
 
     # residual
     setNames(dimSums(residual, dim = 3),          "Emissions|CO2|Land|Cumulative|Land-use Change|+|Residual (Gt CO2)"),
+    setNames(dimSums(residual_pos, dim = 3),      "Emissions|CO2|Land|Cumulative|Land-use Change|Residual|+|Positive (Gt CO2)"),
+    setNames(dimSums(residual_neg, dim = 3),      "Emissions|CO2|Land|Cumulative|Land-use Change|Residual|+|Negative (Gt CO2)"),
 
     # Carbon pools
     setNames(totalPools,                          paste0("Emissions|CO2|Land|Cumulative|++|", getNames(totalPools), " (Gt CO2)")),
@@ -929,17 +972,19 @@ reportEmissions <- function(gdx, level = "regglo", storageWood = TRUE, legacyEmi
     # nolint end
   }
 
-  # Legacy clearing-tail lines, cumulative (only when legacyEmis = TRUE)
+  # Legacy clearing-tail lines, cumulative. As in the yearly block, net + Storage + Release are ALWAYS
+  # emitted (zero when legacyEmis = FALSE) so the variable set is stable across the flag.
+  emissionsReport <- with(cumulativeCO2, mbind(
+    emissionsReport,
+    setNames(legacyNet,     "Emissions|CO2|Land|Cumulative|Land-use Change|+|Legacy clearing (Gt CO2)"),
+    setNames(legacyStorage, "Emissions|CO2|Land|Cumulative|Land-use Change|Legacy clearing|+|Storage (Gt CO2)"),
+    setNames(legacyRelease, "Emissions|CO2|Land|Cumulative|Land-use Change|Legacy clearing|+|Release (Gt CO2)")
+  ))
+  # Cumulative Land-use Change EXCLUDING the legacy reframe (non-additive memo, no "+"): counterpart of the
+  # yearly Excl Legacy clearing line; only meaningful with the reframe on, so gated.
   if (legacyEmis) {
-    emissionsReport <- with(cumulativeCO2, mbind(
-      emissionsReport,
-      setNames(legacyNet,     "Emissions|CO2|Land|Cumulative|Land-use Change|+|Legacy clearing (Gt CO2)"),
-      setNames(legacyStorage, "Emissions|CO2|Land|Cumulative|Land-use Change|Legacy clearing|+|Storage (Gt CO2)"),
-      setNames(legacyRelease, "Emissions|CO2|Land|Cumulative|Land-use Change|Legacy clearing|+|Release (Gt CO2)"),
-      # Cumulative Land-use Change EXCLUDING the legacy reframe (non-additive memo, no "+"): cumulative
-      # counterpart of the yearly Excl Legacy clearing line (= legacyEmis=FALSE value).
-      setNames(eLanduseChange - legacyNet, "Emissions|CO2|Land|Cumulative|Land-use Change|Excl Legacy clearing (Gt CO2)")
-    ))
+    emissionsReport <- with(cumulativeCO2, mbind(emissionsReport,
+      setNames(eLanduseChange - legacyNet, "Emissions|CO2|Land|Cumulative|Land-use Change|Excl Legacy clearing (Gt CO2)")))
   }
 
   checkEmis <- emissionsReport[, , "Emissions|CO2|Land|Cumulative|+|Land-use Change (Gt CO2)"] -
@@ -951,11 +996,39 @@ reportEmissions <- function(gdx, level = "regglo", storageWood = TRUE, legacyEmi
                                   "Emissions|CO2|Land|Cumulative|Land-use Change|+|Residual (Gt CO2)",
                                   "Emissions|CO2|Land|Cumulative|Land-use Change|+|Timber (Gt CO2)",
                                   "Emissions|CO2|Land|Cumulative|Land-use Change|+|Wood Harvest (Gt CO2)",
-                                  if (legacyEmis) "Emissions|CO2|Land|Cumulative|Land-use Change|+|Legacy clearing (Gt CO2)")], dim = 3)
+                                  "Emissions|CO2|Land|Cumulative|Land-use Change|+|Legacy clearing (Gt CO2)")], dim = 3)
 
   if (any(abs(checkEmis) > 1e-03, na.rm = TRUE)) {
     warning("CO2 emission sub-categories do not add up to total")
   }
+
+  # Cumulative counterpart of the yearly Gross Positive / Gross Negative - independent source/sink sums (see the
+  # yearly block). Cumulative Deforestation already folds in Forest degradation, so it is not listed separately.
+  grossPosVarsCum <- c("Emissions|CO2|Land|Cumulative|Land-use Change|+|Deforestation (Gt CO2)",
+                       "Emissions|CO2|Land|Cumulative|Land-use Change|+|Other land conversion (Gt CO2)",
+                       "Emissions|CO2|Land|Cumulative|Land-use Change|+|Wood Harvest (Gt CO2)",
+                       "Emissions|CO2|Land|Cumulative|Land-use Change|Peatland|+|Positive (Gt CO2)",
+                       "Emissions|CO2|Land|Cumulative|Land-use Change|Residual|+|Positive (Gt CO2)",
+                       "Emissions|CO2|Land|Cumulative|Land-use Change|Soil|++|Emissions (Gt CO2)",
+                       "Emissions|CO2|Land|Cumulative|Land-use Change|Timber|+|Release from HWP (Gt CO2)",
+                       "Emissions|CO2|Land|Cumulative|Land-use Change|Legacy clearing|+|Release (Gt CO2)")
+  grossNegVarsCum <- c("Emissions|CO2|Land|Cumulative|Land-use Change|+|Regrowth (Gt CO2)",
+                       "Emissions|CO2|Land|Cumulative|Land-use Change|Peatland|+|Negative (Gt CO2)",
+                       "Emissions|CO2|Land|Cumulative|Land-use Change|Residual|+|Negative (Gt CO2)",
+                       "Emissions|CO2|Land|Cumulative|Land-use Change|Soil|++|Withdrawals (Gt CO2)",
+                       "Emissions|CO2|Land|Cumulative|Land-use Change|Timber|+|Storage in HWP (Gt CO2)",
+                       "Emissions|CO2|Land|Cumulative|Land-use Change|Legacy clearing|+|Storage (Gt CO2)")
+  grossPosCum <- dimSums(emissionsReport[, , grossPosVarsCum], dim = 3)
+  grossNegCum <- dimSums(emissionsReport[, , grossNegVarsCum], dim = 3)
+  # consistency check (like checkEmis above): the source + sink children must partition the net LUC flux
+  grossCheckCum <- emissionsReport[, , "Emissions|CO2|Land|Cumulative|+|Land-use Change (Gt CO2)"] -
+    dimSums(emissionsReport[, , c(grossPosVarsCum, grossNegVarsCum)], dim = 3)
+  if (any(abs(grossCheckCum) > 1e-03, na.rm = TRUE)) {
+    warning("Gross Positive and Gross Negative do not add up to net Land-use Change")
+  }
+  emissionsReport <- mbind(emissionsReport,
+    setNames(grossPosCum, "Emissions|CO2|Land|Cumulative|Land-use Change|Gross Positive (Gt CO2)"),
+    setNames(grossNegCum, "Emissions|CO2|Land|Cumulative|Land-use Change|Gross Negative (Gt CO2)"))
 
   # nolint end
 
@@ -1028,6 +1101,18 @@ reportEmissions <- function(gdx, level = "regglo", storageWood = TRUE, legacyEmi
   ))
 
   # nolint end
+
+  # Cumulative counterpart of the yearly Other Planted Forest managed-forest sink; same guard.
+  if (!is.null(cumulativeLandCarbonSink$managedForestForestryOtherPlanted)) {
+    # nolint start: line_length_linter
+    emissionsReport <- with(cumulativeLandCarbonSink, mbind(
+      emissionsReport,
+      setNames(managedForestForestryOtherPlanted,            "Emissions|CO2|Land Carbon Sink|Cumulative|LPJmL|Managed Land|Managed Forest|+|Other Planted Forest (Gt CO2)"),
+      setNames(managedForestForestryOtherPlantedAboveGround, "Emissions|CO2|Land Carbon Sink|Cumulative|LPJmL|Above Ground Carbon|Managed Land|Managed Forest|+|Other Planted Forest (Gt CO2)"),
+      setNames(managedForestForestryOtherPlantedBelowGround, "Emissions|CO2|Land Carbon Sink|Cumulative|LPJmL|Below Ground Carbon|Managed Land|Managed Forest|+|Other Planted Forest (Gt CO2)")
+    ))
+    # nolint end
+  }
 
   # -----------------------------------------------------------------------------------------------------------------
   # N2O, NOx, NH3 emissions reporting

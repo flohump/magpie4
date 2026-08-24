@@ -81,10 +81,12 @@ S_LAND, NOT this managed-land quantity, so do not benchmark net Land against it.
    Emissions|CO2|Land|Land-use Change|+|Timber \tab Mt CO2/yr \tab Net CO2 flux from harvested wood products (storage minus release) \cr
    Emissions|CO2|Land|Land-use Change|Timber|+|Storage in HWP \tab Mt CO2/yr \tab CO2 stored in harvested wood products (negative values) \cr
    Emissions|CO2|Land|Land-use Change|Timber|+|Release from HWP \tab Mt CO2/yr \tab CO2 released from decay of harvested wood products \cr
-   Emissions|CO2|Land|Land-use Change|+|Legacy clearing \tab Mt CO2/yr \tab REPORTING REFRAME (only when legacyEmis=TRUE): net correction spreading the instantaneous aboveground clearing pulse (deforestation + other-land conversion) over a slash/deadwood decay tail, mirroring the HWP convolution. Added on top of the raw Deforestation/Other-land-conversion lines, which stay at 100 percent instantaneous. \cr
-   Emissions|CO2|Land|Land-use Change|Legacy clearing|+|Storage \tab Mt CO2/yr \tab Clearing carbon deferred into the slash/deadwood pool this year (negative = withdrawal from the instantaneous flux) \cr
-   Emissions|CO2|Land|Land-use Change|Legacy clearing|+|Release \tab Mt CO2/yr \tab Clearing carbon released from decay of the slash/deadwood pool (positive) \cr
+   Emissions|CO2|Land|Land-use Change|+|Legacy clearing \tab Mt CO2/yr \tab REPORTING REFRAME: net correction spreading the instantaneous aboveground clearing pulse (deforestation + other-land conversion) over a slash/deadwood decay tail, mirroring the HWP convolution. Added on top of the raw Deforestation/Other-land-conversion lines, which stay at 100 percent instantaneous. Always reported; exactly zero when legacyEmis=FALSE. \cr
+   Emissions|CO2|Land|Land-use Change|Legacy clearing|+|Storage \tab Mt CO2/yr \tab Clearing carbon deferred into the slash/deadwood pool this year (strictly <= 0, a withdrawal from the instantaneous flux). Always reported; zero when legacyEmis=FALSE. \cr
+   Emissions|CO2|Land|Land-use Change|Legacy clearing|+|Release \tab Mt CO2/yr \tab Clearing carbon released from decay of the slash/deadwood pool (strictly >= 0). Always reported; zero when legacyEmis=FALSE. \cr
    Emissions|CO2|Land|Land-use Change|Excl Legacy clearing \tab Mt CO2/yr \tab Net CO2 flux from land-use change excluding the legacy-clearing reframe: the raw instantaneous accounting, equal to the legacyEmis=FALSE value of +|Land-use Change (non-additive memo; only when legacyEmis=TRUE) \cr
+   Emissions|CO2|Land|Land-use Change|Gross Positive \tab Mt CO2/yr \tab Gross source of the LUC-CO2 flux: all positive process contributions summed (non-additive memo; net = Gross Positive + Gross Negative). Mirrors ScenarioMIP Gross Emissions (Land part). \cr
+   Emissions|CO2|Land|Land-use Change|Gross Negative \tab Mt CO2/yr \tab Gross sink of the LUC-CO2 flux: all negative process contributions summed (non-additive memo). Mirrors ScenarioMIP Gross Removals (Land part). \cr
    Emissions|CO2|Land|Land-use Change|+|Residual \tab Mt CO2/yr \tab Residual CO2 flux not captured in other categories \cr
    Emissions|CO2|Land|Land-use Change|Residual|+|Positive \tab Mt CO2/yr \tab Positive residual CO2 flux \cr
    Emissions|CO2|Land|Land-use Change|Residual|+|Negative \tab Mt CO2/yr \tab Negative residual CO2 flux \cr
@@ -117,9 +119,11 @@ S_LAND, NOT this managed-land quantity, so do not benchmark net Land against it.
    Emissions|CO2|Land|Cumulative|Land-use Change|+|Soil \tab Gt CO2 \tab Cumulative net CO2 flux from soil \cr
    Emissions|CO2|Land|Cumulative|Land-use Change|+|Wood Harvest \tab Gt CO2 \tab Cumulative CO2 emissions from wood harvest \cr
    Emissions|CO2|Land|Cumulative|Land-use Change|+|Timber \tab Gt CO2 \tab Cumulative net CO2 flux from harvested wood products \cr
-   Emissions|CO2|Land|Cumulative|Land-use Change|+|Legacy clearing \tab Gt CO2 \tab Cumulative legacy clearing correction (only when legacyEmis=TRUE) \cr
+   Emissions|CO2|Land|Cumulative|Land-use Change|+|Legacy clearing \tab Gt CO2 \tab Cumulative legacy clearing correction. Always reported; zero when legacyEmis=FALSE. \cr
    Emissions|CO2|Land|Cumulative|Land-use Change|Excl Legacy clearing \tab Gt CO2 \tab Cumulative net CO2 flux from land-use change excluding the legacy reframe (non-additive memo; only when legacyEmis=TRUE) \cr
    Emissions|CO2|Land|Cumulative|Land-use Change|+|Residual \tab Gt CO2 \tab Cumulative residual CO2 flux \cr
+   Emissions|CO2|Land|Cumulative|Land-use Change|Gross Positive \tab Gt CO2 \tab Cumulative gross source of the LUC-CO2 flux (non-additive memo; net = Gross Positive + Gross Negative) \cr
+   Emissions|CO2|Land|Cumulative|Land-use Change|Gross Negative \tab Gt CO2 \tab Cumulative gross sink of the LUC-CO2 flux (non-additive memo) \cr
 }
 }
 

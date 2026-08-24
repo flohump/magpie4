@@ -1,10 +1,9 @@
 #' @title legacyEmissions
-#' @description Reporting-side "legacy clearing tail" for land-clearing CO2. MAgPIE books the aboveground
-#' carbon of land clearing (deforestation + other-land conversion) instantaneously in the clearing year,
-#' whereas bookkeeping models (BLUE, OSCAR, Houghton & Castanheira) carry a slash/deadwood decay tail. This
-#' function re-spreads the instantaneous pulse over a first-order-decay (FOD) pool, mirroring the HWP
-#' convolution in \code{\link{carbonLTS}}, and returns the net correction to add to the raw flux plus its
-#' Storage/Release parts and the pool carbon stock.
+#' @description Reporting-side legacy-clearing tail for land-clearing CO2. MAgPIE books the aboveground carbon of
+#' clearing (deforestation + other-land conversion) instantly; bookkeeping models (BLUE, OSCAR, Houghton &
+#' Castanheira) spread it over a slash/deadwood decay tail. This re-spreads the pulse over a first-order-decay
+#' (FOD) pool, as \code{\link{carbonLTS}} does for harvested wood products (HWP), and returns the net correction
+#' to the raw flux, its Storage/Release parts, and the pool carbon stock.
 #'
 #' @export
 #'
@@ -14,22 +13,17 @@
 #' @param unit "element" (Mt C/yr) or "gas" (Mt CO2/yr)
 #' @param cumulative report annually (FALSE) or cumulatively from \code{baseyear} (TRUE)
 #' @param baseyear baseyear for cumulative emissions (default 1995)
-#' @param priming pre-firstYear clearing history that primes the decay tail: "hist" (default, the
-#' bookkeeping-ensemble global LUC-CO2 rescaled to the model's early-period level - internally consistent with
-#' the validation cloud), "ramp" (stylised linear 0.3->1.0), "half" (flat 0.5x) or "peak" (flat 1x). This is
-#' the only non-mass-conserving element: it credits pre-firstYear clearing MAgPIE never modelled (an initial
-#' pool stock, like the 1970 seed in carbonLTS). Sourced from the LUC-history record, NOT tuned to a cloud.
-#' @param primingStart first year of the priming window (default 1850); results are insensitive below ~1950.
-#' @param harvestSlashFrac fraction of the wood-harvest aboveground flux added as dead slash (default 0, OFF).
-#' Coarse sensitivity switch only - it does NOT net out the product carbon already deferred by carbonLTS (HWP).
-#' @param a0Biome immediate/combustion fraction per Koeppen main group (A tropical, B arid, C temperate,
-#' D boreal, E polar). The pulse is split by group and a separate FOD pool run per group, then summed (the FOD
-#' is linear -> an exact mixture of exponentials), because deadwood decay is fast in the tropics and slow in
-#' the boreal. Default A 0.25 / B 0.25 / C 0.20 / D 0.15 / E 0.15, anchored to Houghton et al. 2012's
-#' clearing-year burn partition (~0.2 burned, ~0.7 to slash; doi:10.5194/bg-9-5125-2012), graded by biome.
-#' @param halfLifeBiome slash/deadwood FOD half-life (years) per Koeppen group. Default A 4 / B 8 / C 10 /
-#' D 20 / E 25, anchored to coarse-woody-debris decay data (Chambers et al. 2000, Harmon et al. 2020,
-#' Russell et al. 2014); boreal is the least constrained.
+#' @param priming assumed pre-firstYear clearing history that sets the pool's initial stock: "hist" (default, the
+#' bookkeeping-ensemble LUC-CO2 shape), "ramp" (linear 0.3->1.0), "half" (flat 0.5x) or "peak" (flat 1x). The only
+#' non-mass-conserving element - it credits pre-firstYear clearing MAgPIE never modelled (cf. carbonLTS's 1970 seed).
+#' @param primingStart first year of the priming window (default 1850; results insensitive below ~1950).
+#' @param harvestSlashFrac fraction of the wood-harvest aboveground flux added as dead slash (default 0, OFF);
+#' a coarse sensitivity switch that does NOT net out the HWP carbon carbonLTS already defers.
+#' @param a0Biome immediate/combustion fraction per Koeppen main group (A tropical, B arid, C temperate, D boreal,
+#' E polar). Default A 0.25 / B 0.25 / C 0.20 / D 0.15 / E 0.15, from Houghton et al. 2012's clearing-year burn
+#' partition (doi:10.5194/bg-9-5125-2012).
+#' @param halfLifeBiome slash/deadwood decay half-life (years) per Koeppen group. Default A 4 / B 8 / C 10 / D 20 /
+#' E 25, from coarse-woody-debris decay data (Chambers et al. 2000, Harmon et al. 2020, Russell et al. 2014).
 #'
 #' @return MAgPIE object (region x year x name) with "legacy_net" (delta to add to Land-use Change),
 #' "legacy_storage" (<= 0, deferred emission), "legacy_release" (>= 0, decay outflow) and "legacy_stock"
@@ -37,26 +31,19 @@
 #' = -diff(legacy_stock) by construction. Mt C or CO2 (per \code{unit}); cumulative fluxes are rebased to
 #' \code{baseyear} as in \code{\link{carbonLTS}} (legacy_stock, a level, is returned only for cumulative = FALSE).
 #'
-#' @details Pulse P(t) = instantaneous aboveground (vegc+litc) clearing CO2: deforestation (all tree pools) +
-#' other-land conversion, read as reportEmissions reads its Deforestation/Other-land-conversion children but
-#' taking only Above Ground Carbon. Soil carbon is excluded (released gradually by module 59, reported as
-#' lu_som); degradation is excluded (land-neutral, matched by Regrowth). y1995 carries no reported clearing
-#' flux (emisCO2 masks year 1), so the pulse starts at the first reported year and the pre-1995 level is
-#' anchored to the mean of the first up-to-three reported years.
+#' @details The pulse is aboveground (vegc+litc) clearing CO2 only - deforestation + other-land conversion; soil
+#' carbon and degradation are excluded. It is interpolated from MAgPIE's 5/10-yr steps to annual temporal resolution,
+#' split by Koeppen group (fast decay in the tropics, slow in the boreal) with a separate pool per group, then summed;
+#' the fraction a0 is released immediately and the rest (1-a0) decays with the group half-life (see the code for
+#' the recursion). y1995 has no reported clearing flux, so the pulse starts at the first reported year, anchored to
+#' the mean of the first few.
 #'
-#' FOD pool (IPCC first-order decay, as in \code{\link{carbonLTS}}): alpha = exp(-ln2/halfLife); inflow =
-#' (1-a0)*P (mass-conserving, so a0 is exactly the immediate release); stock[t+1] = alpha*stock[t] + inflow[t]
-#' on an annual grid; outflow(t) = (1-alpha)*stock(t). The reframed booking is a0*P + outflow, so the reported
-#' delta is legacy_net = outflow - (1-a0)*P = -diff(stock). Reporting `stock` as a carbon line keeps the
-#' reframed emission and the carbon stock consistent (emission = -change in stock). The clearing pulse is
-#' aggregated to \code{level} before the convolution; the FOD is linear, so this is exact at regglo and keeps
-#' the recursion off the (much larger) cell grid.
-#'
-#' HONEST CAVEATS: (1) reporting reframe only - the model still emits instantaneously and the carbon price is
-#' unchanged. (2) not mass-conserving: the priming injects a legacy tail (~+15% [ramp] of cumulative 1995-2100
-#' LUC, ~+6% [half] to ~+21% [peak]) crediting clearing MAgPIE never modelled - now made explicit as the
-#' legacy_stock initial level (cf. carbonLTS's 1970 seed). (3) keep the RAW instantaneous flux as default so
-#' the choice stays auditable. (4) necessary-but-not-sufficient: a residual scope gap to bookkeeping remains.
+#' Caveats: (1) reporting reframe only - the model still emits instantaneously and the carbon price is unchanged;
+#' raw emissions stay available via legacyEmis = FALSE. (2) not mass-conserving: the priming credit is a one-off
+#' initial pool; being a linear decay it is proportional to the priming amplitude, so half = exactly 0.5x peak and
+#' the default hist sits near peak. (3) a residual scope gap to bookkeeping remains. The cumulative legacy series
+#' is the timestep-weighted integral of the yearly one (both at the model timesteps); carbon still in the pool at
+#' 2100 never enters the reported window.
 #'
 #' @author Florian Humpenoeder
 #' @importFrom stats approx
@@ -83,15 +70,15 @@ legacyEmissions <- function(gdx,
   # reportCarbonstock); unit and cumulative are cheap wrapper transforms on the annual Mt C pool.
   legacy <- legacyClearingPool(gdx, level, priming, primingStart, harvestSlashFrac, a0Biome, halfLifeBiome)
 
-  # cumulative transform (identical to carbonLTS): annual timestep weight, zero 1995, cumsum, rebase. Only the
-  # three fluxes are cumulated; legacy_stock is a level, so it is dropped in cumulative mode.
+  # cumulative transform at the MODEL timesteps (same convention as reportEmissions' raw emissions), so that
+  # integrating the yearly legacy series with timestep weights reproduces the cumulative one. legacy_stock is a
+  # level, so it is dropped in cumulative mode.
   if (cumulative) {
-    legacy <- legacy[, , "legacy_stock", invert = TRUE]
-    years <- getYears(legacy, as.integer = TRUE)
-    imYears <- new.magpie("GLO", years, NULL)
-    imYears[, , ] <- c(1, diff(years))
+    legacy    <- legacy[, , "legacy_stock", invert = TRUE]
+    timesteps <- m_yeardiff(gdx)
+    legacy    <- legacy[, getYears(timesteps), ]
     legacy[, "y1995", ] <- 0
-    legacy <- legacy * imYears[, getYears(legacy), ]
+    legacy <- legacy * timesteps[, getYears(legacy), ]
     legacy <- as.magpie(apply(legacy, c(1, 3), cumsum))
     legacy <- legacy - setYears(legacy[, baseyear, ], NULL)
   }
@@ -179,13 +166,9 @@ legacyClearingPool <- memoise(function(gdx,
   histYear <- seq(1850, 2000, 10)
   histFrac <- c(0.33, 0.34, 0.41, 0.47, 0.57, 0.65, 0.68, 0.74, 0.86, 0.91, 1.04, 0.93, 0.85, 0.79, 0.94, 1.00)
 
-  # FOD slash/deadwood convolution of ONE cell-level sub-pulse. Interpolates to the annual grid and clamps
-  # negatives at CELL level (the only nonlinearity), then aggregates to `level` and runs the fully-linear part
-  # (priming + IPCC first-order-decay pool) on the small region grid - exact at regglo and ~15x cheaper than the
-  # cell recursion. Returns the legacy delta (net/storage/release, priming years zeroed) plus the pool carbon
-  # level (legacy_stock, priming kept as the initial stock). Closes over firstYear / anchorYears / priming /
-  # primingStart / lastYear / aggregatePulse. Called once per Koeppen main-group on the fraction-weighted
-  # sub-pulse; the FOD is linear, so the sum of the per-group results is exact.
+  # FOD convolution of ONE cell-level sub-pulse: interpolate to annual, clamp negatives at cell level (the only
+  # nonlinearity), aggregate to `level`, then run the linear priming + decay pool (exact at regglo, ~15x cheaper
+  # than the cell recursion). Returns the legacy delta (priming years zeroed) plus the pool level legacy_stock.
   slashPool <- function(subPulse, a0, halfLife) {
     pc          <- subPulse[, getYears(subPulse, as.integer = TRUE) >= firstYear, ]
     pcAnchor    <- setYears(dimSums(pc[, anchorYears, ], dim = 2) / length(anchorYears), NULL)
@@ -250,10 +233,8 @@ legacyClearingPool <- memoise(function(gdx,
     superAggregateX(subPulse, aggr_type = "sum", level = level)
   }
 
-  # Split the clearing pulse by Koeppen main group (A tropical / B arid / C temperate / D boreal-continental /
-  # E polar) and run a SEPARATE slash pool per group, then sum. CWD decay is fast in the tropics (~4 yr half-
-  # life) and slow in the boreal (~20 yr), and a0 is graded tropical > temperate > boreal; a single global pool
-  # would mis-time the ~60% tropical share of clearing.
+  # Split the clearing pulse by Koeppen main group and run a separate slash pool per group, then sum (decay is
+  # fast in the tropics, slow in the boreal; a single global pool would mis-time the large tropical share).
   climateClass <- readGDX(gdx, "pm_climate_class", react = "silent")
   if (is.null(climateClass)) {
     # Fallback for a gdx without the Koeppen classification (should not occur for standard runs): a single
