@@ -69,6 +69,17 @@ reportLandUse <- function(gdx) {
   }
   x <- mbind(x,setNames(dimSums(a[,,c("crop_area","crop_fallow","crop_treecover","past")],dim=3),"Resources|Land Cover|Agricultural land (million ha)"))
 
+  # intact forest landscapes (static map capped by current land, see landIFL)
+  ifl <- landIFL(gdx, level = "regglo")
+  if (!is.null(ifl)) {
+    ifl <- ifl[getItems(x, dim = 1), , ]
+    p <- "Resources|Land Cover|Intact Forest Landscapes"
+    x <- mbind(x, setNames(dimSums(ifl, dim = 3), paste0(p, " (million ha)")))
+    x <- mbind(x, setNames(ifl[, , "primforest"], paste0(p, "|+|Primary Forest (million ha)")))
+    x <- mbind(x, setNames(ifl[, , "secdforest"], paste0(p, "|+|Secondary Forest (million ha)")))
+    x <- mbind(x, setNames(ifl[, , "other"],      paste0(p, "|+|Other Land (million ha)")))
+  }
+
   return(x)
 }
 

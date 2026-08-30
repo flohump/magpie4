@@ -25,6 +25,9 @@ low pass filter = 3\tabular{lll}{
    Emissions|CO2|Land|+|Indirect \tab Mt CO2/yr \tab indirect human-induced CO2 emissions from land use (land carbon sink); based on estimates from Grassi et al 2021 \cr
    Emissions|CO2|Land|+|Land-use Change \tab Mt CO2/yr \tab direct human-induced CO2 emissions from land use change, harvest and regrowth \cr
    Emissions|CO2|Land|Land-use Change|+|Regrowth \tab Mt CO2/yr \tab negative CO2 emissions from regrowth \cr
+   Emissions|CO2|Land|Inventory-aligned \tab Mt CO2/yr \tab direct CO2 emissions from land use on all land plus LPJmL land carbon sink on managed land (outside intact forest landscapes); comparable to national GHG inventories \cr
+   Emissions|CO2|Land Carbon Sink|LPJmL|+++|Managed Land (non-IFL) \tab Mt CO2/yr \tab LPJmL land carbon sink on land outside intact forest landscapes (see landIFL) \cr
+   Emissions|CO2|Land Carbon Sink|LPJmL|+++|Intact Forest Landscapes \tab Mt CO2/yr \tab LPJmL land carbon sink inside intact forest landscapes (see landIFL) \cr
 }
 }
 
@@ -35,6 +38,7 @@ raw data; no low pass filter applied\tabular{lll}{
    Emissions|CO2|+|Land RAW \tab Mt CO2/yr \tab direct and indirect human-induced CO2 emissions from land use \cr
    Emissions|CO2|Land|+|Indirect RAW \tab Mt CO2/yr \tab indirect human-induced CO2 emissions from land use (land carbon sink); based on estimates from Grassi et al 2021 \cr
    Emissions|CO2|Land|+|Land-use Change RAW \tab Mt CO2/yr \tab direct human-induced CO2 emissions from land use change, harvest and regrowth \cr
+   Emissions|CO2|Land RAW|Inventory-aligned \tab Mt CO2/yr \tab as Emissions|CO2|Land|Inventory-aligned, no low pass filter \cr
 }
 }
 

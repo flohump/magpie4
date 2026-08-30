@@ -20,6 +20,9 @@
 #' Emissions\|CO2\|Land\|+\|Indirect | Mt CO2/yr | indirect human-induced CO2 emissions from land use (land carbon sink); based on estimates from Grassi et al 2021
 #' Emissions\|CO2\|Land\|+\|Land-use Change | Mt CO2/yr | direct human-induced CO2 emissions from land use change, harvest and regrowth
 #' Emissions\|CO2\|Land\|Land-use Change\|+\|Regrowth | Mt CO2/yr | negative CO2 emissions from regrowth
+#' Emissions\|CO2\|Land\|Inventory-aligned | Mt CO2/yr | direct CO2 emissions from land use on all land plus LPJmL land carbon sink on managed land (outside intact forest landscapes); comparable to national GHG inventories
+#' Emissions\|CO2\|Land Carbon Sink\|LPJmL\|+++\|Managed Land (non-IFL) | Mt CO2/yr | LPJmL land carbon sink on land outside intact forest landscapes (see landIFL)
+#' Emissions\|CO2\|Land Carbon Sink\|LPJmL\|+++\|Intact Forest Landscapes | Mt CO2/yr | LPJmL land carbon sink inside intact forest landscapes (see landIFL)
 #' @section Tier-2 variables:
 #' raw data; no low pass filter applied
 #' Name | Unit | Meta
@@ -27,6 +30,7 @@
 #' Emissions\|CO2\|+\|Land RAW | Mt CO2/yr | direct and indirect human-induced CO2 emissions from land use
 #' Emissions\|CO2\|Land\|+\|Indirect RAW | Mt CO2/yr | indirect human-induced CO2 emissions from land use (land carbon sink); based on estimates from Grassi et al 2021
 #' Emissions\|CO2\|Land\|+\|Land-use Change RAW | Mt CO2/yr | direct human-induced CO2 emissions from land use change, harvest and regrowth
+#' Emissions\|CO2\|Land RAW\|Inventory-aligned | Mt CO2/yr | as Emissions\|CO2\|Land\|Inventory-aligned, no low pass filter
 #' @md
 #'
 reportEmissions <- function(gdx, storageWood = TRUE) {
@@ -375,6 +379,51 @@ reportEmissions <- function(gdx, storageWood = TRUE) {
     }
 
     # -----------------------------------------------------------------------------------------------------------------
+    # LPJmL land carbon sink split into managed land (non-IFL) and intact forest landscapes (IFL, landIFL).
+    # Vegetation term per class scaled by the IFL share of the class; soil term of all classes scaled by the
+    # IFL share of total land (one soil pool; per-class soil attribution is not robust, see emisCO2).
+    # Split at cluster level, aggregated, then lowpass filtered.
+
+    .calcLandCarbonSinkIFL <- function(.lowpass = 3) {
+        ifl <- landIFL(gdx, level = "cell")
+        if (is.null(ifl)) {
+            return(NULL)
+        }
+        cc <- emisCO2(gdx, level = "cell", unit = "gas", sum_land = FALSE, sum_cpool = FALSE)[, , "cc", drop = TRUE]
+        a  <- land(gdx, level = "cell")
+
+        .share <- function(part, total) {
+            suppressMessages(toolConditionalReplace(collapseNames(part) / collapseNames(total), "is.na()", 0))
+        }
+        sPrim  <- .share(ifl[, , "primforest"], a[, , "primforest"])
+        sSecd  <- .share(ifl[, , "secdforest"], a[, , "secdforest"])
+        sOther <- .share(ifl[, , "other"], a[, , "other"])
+        sLand  <- .share(dimSums(ifl, dim = 3), dimSums(a, dim = 3))
+
+        above <- cc[, , "Above Ground Carbon", drop = TRUE]
+        below <- cc[, , "Below Ground Carbon", drop = TRUE]
+        otherSet <- grep("^other", getNames(above), value = TRUE)
+
+        iflAbove <- collapseNames(above[, , "primforest"]) * sPrim +
+                    collapseNames(above[, , "secdforest"]) * sSecd +
+                    dimSums(above[, , otherSet], dim = 3) * sOther
+        iflBelow <- dimSums(below, dim = 3) * sLand
+
+        x <- mbind(setNames(dimSums(above, dim = 3) - iflAbove, "managedAbove"),
+                   setNames(iflAbove,                            "iflAbove"),
+                   setNames(dimSums(below, dim = 3) - iflBelow, "managedBelow"),
+                   setNames(iflBelow,                            "iflBelow"))
+        x <- superAggregateX(x, level = "regglo", aggr_type = "sum")
+        if (.lowpass > 0) {
+            x <- .applyLowpassFilter(x, lowpass = .lowpass)
+        }
+        return(list(managedAbove = collapseNames(x[, , "managedAbove"]),
+                    iflAbove     = collapseNames(x[, , "iflAbove"]),
+                    managedBelow = collapseNames(x[, , "managedBelow"]),
+                    iflBelow     = collapseNames(x[, , "iflBelow"])))
+    }
+
+    # -----------------------------------------------------------------------------------------------------------------
     # Generate reports
 
     emissionsReport <- NULL
@@ -699,6 +748,30 @@ reportEmissions <- function(gdx, storageWood = TRUE) {
     # nolint end
 
     # -----------------------------------------------------------------------------------------------------------------
+    # LPJmL land carbon sink split by intact forest landscapes, lowpass = 3
+
+    iflLandCarbonSink <- .calcLandCarbonSinkIFL(.lowpass = 3)
+
+    if (!is.null(iflLandCarbonSink)) {
+        # nolint start
+        emissionsReport <- with(iflLandCarbonSink, mbind(
+            emissionsReport,
+
+            setNames(managedAbove + managedBelow, "Emissions|CO2|Land Carbon Sink|LPJmL|+++|Managed Land (non-IFL) (Mt CO2/yr)"),
+            setNames(iflAbove + iflBelow,         "Emissions|CO2|Land Carbon Sink|LPJmL|+++|Intact Forest Landscapes (Mt CO2/yr)"),
+            setNames(managedAbove,                "Emissions|CO2|Land Carbon Sink|LPJmL|Above Ground Carbon|++|Managed Land (non-IFL) (Mt CO2/yr)"),
+            setNames(iflAbove,                    "Emissions|CO2|Land Carbon Sink|LPJmL|Above Ground Carbon|++|Intact Forest Landscapes (Mt CO2/yr)"),
+            setNames(managedBelow,                "Emissions|CO2|Land Carbon Sink|LPJmL|Below Ground Carbon|++|Managed Land (non-IFL) (Mt CO2/yr)"),
+            setNames(iflBelow,                    "Emissions|CO2|Land Carbon Sink|LPJmL|Below Ground Carbon|++|Intact Forest Landscapes (Mt CO2/yr)"),
+
+            # inventory-aligned net flux: direct flux on all land + indirect flux on managed (non-IFL) land
+            setNames(collapseNames(emissionsReport[, , "Emissions|CO2|Land|+|Land-use Change (Mt CO2/yr)"]) + managedAbove + managedBelow,
+                     "Emissions|CO2|Land|Inventory-aligned (Mt CO2/yr)")
+        ))
+        # nolint end
+    }
+
+    # -----------------------------------------------------------------------------------------------------------------
     # RAW yearly indirect CO2 emissions from land-use change (land-carbon sink) reporting
 
     rawLandCarbonSink <- .calcLandCarbonSink(.lowpass = 0)
@@ -766,6 +839,30 @@ reportEmissions <- function(gdx, storageWood = TRUE) {
         setNames(unmanagedLandOtherBelowGround,         "Emissions|CO2|Land Carbon Sink RAW|LPJmL|Below Ground Carbon|Unmanaged Land|+|Other Land (Mt CO2/yr)")
     ))
     # nolint end
+
+    # -----------------------------------------------------------------------------------------------------------------
+    # LPJmL land carbon sink split by intact forest landscapes, raw
+
+    iflLandCarbonSink <- .calcLandCarbonSinkIFL(.lowpass = 0)
+
+    if (!is.null(iflLandCarbonSink)) {
+        # nolint start
+        emissionsReport <- with(iflLandCarbonSink, mbind(
+            emissionsReport,
+
+            setNames(managedAbove + managedBelow, "Emissions|CO2|Land Carbon Sink RAW|LPJmL|+++|Managed Land (non-IFL) (Mt CO2/yr)"),
+            setNames(iflAbove + iflBelow,         "Emissions|CO2|Land Carbon Sink RAW|LPJmL|+++|Intact Forest Landscapes (Mt CO2/yr)"),
+            setNames(managedAbove,                "Emissions|CO2|Land Carbon Sink RAW|LPJmL|Above Ground Carbon|++|Managed Land (non-IFL) (Mt CO2/yr)"),
+            setNames(iflAbove,                    "Emissions|CO2|Land Carbon Sink RAW|LPJmL|Above Ground Carbon|++|Intact Forest Landscapes (Mt CO2/yr)"),
+            setNames(managedBelow,                "Emissions|CO2|Land Carbon Sink RAW|LPJmL|Below Ground Carbon|++|Managed Land (non-IFL) (Mt CO2/yr)"),
+            setNames(iflBelow,                    "Emissions|CO2|Land Carbon Sink RAW|LPJmL|Below Ground Carbon|++|Intact Forest Landscapes (Mt CO2/yr)"),
+
+            # inventory-aligned net flux: direct flux on all land + indirect flux on managed (non-IFL) land
+            setNames(collapseNames(emissionsReport[, , "Emissions|CO2|Land RAW|+|Land-use Change (Mt CO2/yr)"]) + managedAbove + managedBelow,
+                     "Emissions|CO2|Land RAW|Inventory-aligned (Mt CO2/yr)")
+        ))
+        # nolint end
+    }
 
     # -----------------------------------------------------------------------------------------------------------------
     # Cumulative CO2 emissions, lowpass = 0
