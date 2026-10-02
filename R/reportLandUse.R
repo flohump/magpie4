@@ -69,13 +69,17 @@ reportLandUse <- function(gdx) {
   }
   x <- mbind(x,setNames(dimSums(a[,,c("crop_area","crop_fallow","crop_treecover","past")],dim=3),"Resources|Land Cover|Agricultural land (million ha)"))
 
-  # intact and non-intact forest (map of Grassi et al. 2023 capped by forest area, see intactForest)
-  intact <- intactForest(gdx, level = "regglo")
-  if (!is.null(intact)) {
-    intact <- dimSums(intact[getItems(x, dim = 1), , ], dim = 3)
+  # intact forest (map of Grassi et al. 2023 capped by forest area, see intactForest); the map has no other land
+  ifl <- intactForest(gdx, level = "regglo")
+  if (!is.null(ifl)) {
+    ifl <- ifl[getItems(x, dim = 1), , ]
+    p <- "Resources|Land Cover|Intact Forest Landscapes"
     forest <- collapseNames(x[, , paste0("Resources|Land Cover|+|", reportingnames("forest"), " (million ha)")])
-    x <- mbind(x, setNames(intact,          "Resources|Land Cover|Forest|++|Intact (million ha)"))
-    x <- mbind(x, setNames(forest - intact, "Resources|Land Cover|Forest|++|Non-intact (million ha)"))
+    x <- mbind(x, setNames(dimSums(ifl, dim = 3), paste0(p, " (million ha)")))
+    x <- mbind(x, setNames(ifl[, , "primforest"], paste0(p, "|+|Primary Forest (million ha)")))
+    x <- mbind(x, setNames(ifl[, , "secdforest"], paste0(p, "|+|Secondary Forest (million ha)")))
+    x <- mbind(x, setNames(ifl[, , "primforest"] * 0, paste0(p, "|+|Other Land (million ha)")))
+    x <- mbind(x, setNames(forest - dimSums(ifl, dim = 3), "Resources|Land Cover|Non-intact Forest (million ha)"))
   }
 
   return(x)
