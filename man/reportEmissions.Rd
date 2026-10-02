@@ -25,9 +25,10 @@ low pass filter = 3\tabular{lll}{
    Emissions|CO2|Land|+|Indirect \tab Mt CO2/yr \tab indirect human-induced CO2 emissions from land use (land carbon sink); based on estimates from Grassi et al 2021 \cr
    Emissions|CO2|Land|+|Land-use Change \tab Mt CO2/yr \tab direct human-induced CO2 emissions from land use change, harvest and regrowth \cr
    Emissions|CO2|Land|Land-use Change|+|Regrowth \tab Mt CO2/yr \tab negative CO2 emissions from regrowth \cr
-   Emissions|CO2|Land|Inventory-aligned \tab Mt CO2/yr \tab direct CO2 emissions from land use on all land plus LPJmL land carbon sink on managed land (outside intact forest landscapes); comparable to national GHG inventories \cr
-   Emissions|CO2|Land Carbon Sink|LPJmL|+++|Managed Land (non-IFL) \tab Mt CO2/yr \tab LPJmL land carbon sink on land outside intact forest landscapes (see landIFL) \cr
-   Emissions|CO2|Land Carbon Sink|LPJmL|+++|Intact Forest Landscapes \tab Mt CO2/yr \tab LPJmL land carbon sink inside intact forest landscapes (see landIFL) \cr
+   Emissions|CO2|Land|Inventory-aligned \tab Mt CO2/yr \tab direct CO2 emissions from land use on all land plus LPJmL land carbon sink outside intact forest; comparable to national GHG inventories \cr
+   Emissions|CO2|Land Carbon Sink|LPJmL|+++|Intact Forest \tab Mt CO2/yr \tab LPJmL land carbon sink in intact forest (see intactForest) \cr
+   Emissions|CO2|Land Carbon Sink|LPJmL|+++|Outside Intact Forest \tab Mt CO2/yr \tab LPJmL land carbon sink on all land outside intact forest \cr
+   Emissions|CO2|Land Carbon Sink|LPJmL|Non-intact Forest \tab Mt CO2/yr \tab LPJmL land carbon sink in forest outside intact forest (scope of Grassi et al. 2021) \cr
 }
 }
 
