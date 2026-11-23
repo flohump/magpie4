@@ -28,8 +28,9 @@ reportWoodFuel <- function(gdx, file = NULL) {
   attrWoodFuel       <- gdx2::readGDX(gdx, "fm_attributes")[, , "woodfuel"][, , "ge"] # PJ/Mt DM
   i2iso              <- gdx2::readGDX(gdx, "i_to_iso")
   imVolConv          <- gdx2::readGDX(gdx, "im_vol_conv") # tDM / m^3 = MtDM / Mm^3
-  # FAO woodfuel is in stere (stacked m3); pm_demand_forestry already applies this correction
-  stackingFactor     <- gdx2::readGDX(gdx, "s73_woodfuel_stacking_factor")
+  # only older gdx carry a wood fuel stacking factor (0.65 on FAO volumes); without it FAO solid m3 are used as they are
+  stackingFactor     <- gdx2::readGDX(gdx, "s73_woodfuel_stacking_factor", react = "silent")
+  if (is.null(stackingFactor)) stackingFactor <- 1
 
   # Subset to modelled timesteps only
   tModelled         <- gdx2::readGDX(gdx, "t")
@@ -46,7 +47,7 @@ reportWoodFuel <- function(gdx, file = NULL) {
     demandWoodFuelIso[, yearsAfter2100, ] <- setYears(demandWoodFuelIso[, "y2100", ], NULL)
   }
 
-  # Quality check: ISO vs regional consistency (both in MtDM after stacking correction)
+  # Quality check: ISO vs regional consistency (both in MtDM)
   cyears <- intersect(getYears(demandWoodFuelIso), getYears(demandWoodFuelReg))
   diff   <- round(dimSums(demandWoodFuelIso[, cyears, ] * stackingFactor * volConWoodIso, dim = 1), 3) -
     round(dimSums(demandWoodFuelReg[, cyears, ], dim = 1), 3)
@@ -54,7 +55,7 @@ reportWoodFuel <- function(gdx, file = NULL) {
     warning("Discrepancy between ISO and regional wood fuel (check s73_timber_demand_switch)")
   }
 
-  # Convert to PJ: stere * stacking_factor -> solid m3; solid m3 * MtDM/Mm3 * PJ/MtDM
+  # Convert to PJ: solid m3 * MtDM/Mm3 * PJ/MtDM
   demandWoodFuelPJ <- demandWoodFuelIso * stackingFactor * volConWoodIso * attrWoodFuel
   getNames(demandWoodFuelPJ) <- "Biomass supply|Wood fuel (PJ/yr)"
   getSets(demandWoodFuelPJ) <- c("iso", "year", "data")

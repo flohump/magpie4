@@ -23,6 +23,7 @@ reports MAgPIE harvested area for timber.
    Resources|Timber operations|Harvested area for timber|Forestry \tab Mha per yr \tab Area harvested from managed forests \cr
    Resources|Timber operations|Harvested area for timber|Primary forest \tab Mha per yr \tab Area harvested from primary forests \cr
    Resources|Timber operations|Harvested area for timber|Secondary forest \tab Mha per yr \tab Area harvested from secondary forests \cr
+   Resources|Timber operations|Selectively logged area \tab Mha per yr \tab Secondary forest selectively logged \cr
 }
 }
 

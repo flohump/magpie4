@@ -34,6 +34,7 @@ reports MAgPIE demand for timber.
    Timber|Volumetric|Production|Roundwood|+|Industrial roundwood \tab Mm3/yr \tab Production of industrial roundwood \cr
    Timber|Volumetric|Production|Roundwood|+|Wood fuel \tab Mm3/yr \tab Production of wood fuel \cr
    Timber|Volumetric|Production|Roundwood|+|Timber for construction \tab Mm3/yr \tab Production of timber for construction \cr
+   Timber|Volumetric|Production|Roundwood|Selective logging \tab Mm3/yr \tab Felled stem volume of selectively logged secondary forest \cr
 }
 }
 
