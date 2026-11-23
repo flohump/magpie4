@@ -802,6 +802,32 @@ emisCO2 <- function(gdx, file = NULL, level = "cell", unit = "gas",
     }
 
     ###
+    # Stand-density state of secondary forest (module 35, gdx with p35_dens_post): vegetation carbon beyond the curve
+    # density. Losses of cleared stands at their start-of-step state; the rest of its change is regrowth (MtC per step).
+    calculateStandDensityState <- function(areas, densities) {
+        densPost <- readGDX(gdx, "p35_dens_post", react = "silent")
+        densStart <- readGDX(gdx, "p35_dens", react = "silent")
+        if (is.null(densPost) || is.null(densStart)) return(NULL)
+        yrs <- getYears(areas$secdforest)
+        curve <- collapseNames(densities$secdforest[, , "vegc"])[, yrs, ]
+        extraPost <- curve * (densPost[, yrs, getItems(curve, dim = 3)] - 1)
+        extraStart <- curve * (densStart[, yrs, getItems(curve, dim = 3)] - 1)
+        reduction <- readGDX(gdx, "ov35_secdforest_reduction", select = list(type = "level"))[, yrs, ]
+        harvest <- readGDX(gdx, "ov35_hvarea_secdforest", select = list(type = "level"))[, yrs, ]
+        disturbance <- readGDX(gdx, "p35_disturbance_loss_secdf")[, yrs, ]
+        stock <- dimSums(collapseNames(areas$secdforest) * extraPost, dim = 3)
+        net <- stock
+        net[, , ] <- 0
+        for (i in 2:nyears(stock)) net[, i, ] <- setYears(stock[, i - 1, ], getYears(stock[, i, ])) - stock[, i, ]
+        harvestState <- dimSums(harvest * extraStart, dim = 3)
+        deforState <- dimSums((reduction - harvest) * extraStart, dim = 3)
+        degradState <- dimSums(disturbance * extraStart, dim = 3)
+        harvestState[, 1, ] <- deforState[, 1, ] <- degradState[, 1, ] <- 0
+        return(list(stock = stock, net = net, harvest = harvestState, defor = deforState, degrad = degradState,
+                    regrowth = net - harvestState - deforState - degradState))
+    }
+
+    ###
     # CALCULATIONS ----------------------------------------------------------------------------------------------------
 
     # --- prepare input objects
@@ -844,6 +870,14 @@ emisCO2 <- function(gdx, file = NULL, level = "cell", unit = "gas",
         emisDegrad[, , "secdforest.vegc"] <- emisDegrad[, , "secdforest.vegc"] + structObjVeg
     }
 
+    state <- calculateStandDensityState(areas, densities)
+    if (!is.null(state)) {
+        emisHarvest[, , "secdforest.vegc"]       <- emisHarvest[, , "secdforest.vegc"] + state$harvest
+        emisDeforestation[, , "secdforest.vegc"] <- emisDeforestation[, , "secdforest.vegc"] + state$defor
+        emisDegrad[, , "secdforest.vegc"]        <- emisDegrad[, , "secdforest.vegc"] + state$degrad
+        emisRegrowth[, , "secdforest.vegc"]      <- emisRegrowth[, , "secdforest.vegc"] + state$regrowth
+    }
+
     subcomponents <- emisRegrowth + emisDeforestation + emisDegrad + emisOtherLand + emisHarvest
 
     # --- net emissions
@@ -853,6 +887,11 @@ emisCO2 <- function(gdx, file = NULL, level = "cell", unit = "gas",
     emisCC          <- mainEmissions$emisCC
     emisArea        <- mainEmissions$emisArea
     emisInteract    <- mainEmissions$emisInteract
+    if (!is.null(state)) {
+        totalStockCheck[, , "secdforest.vegc"] <- totalStockCheck[, , "secdforest.vegc"] + state$stock
+        emisNet[, , "secdforest.vegc"]         <- emisNet[, , "secdforest.vegc"] + state$net
+        emisArea[, , "secdforest.vegc"]        <- emisArea[, , "secdforest.vegc"] + state$net
+    }
 
     # As without cc there could be no interaction emissions, we assign these to emisCC
     emisCC <- emisCC + emisInteract

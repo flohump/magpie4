@@ -30,9 +30,14 @@ reports Growing stocks for woody materials
 \tabular{lll}{
    Name \tab Unit \tab Meta \cr
    Resources|Growing Stock|relative|Forest \tab m3/ha \tab Relative growing stock in forests \cr
+   Resources|Growing Stock|relative|Forest excl CO2-price AR \tab m3/ha \tab Relative growing stock in forests without CO2-price afforestation (comparable to FRA) \cr
+   Resources|Growing Stock|relative|CO2-price AR \tab m3/ha \tab Relative growing stock in CO2-price afforestation \cr
+   Resources|Growing Stock|relative|NPI_NDC AR \tab m3/ha \tab Relative growing stock in NPI/NDC afforestation \cr
    Resources|Growing Stock|relative|Plantations \tab m3/ha \tab Relative growing stock in plantations \cr
+   Resources|Growing Stock|relative|Other Planted Forest \tab m3/ha \tab Relative growing stock in other planted forest (gdx with that pool) \cr
    Resources|Growing Stock|absolute|Forest \tab Mm3 \tab Absolute growing stock in forests \cr
    Resources|Growing Stock|absolute|Plantations \tab Mm3 \tab Absolute growing stock in plantations \cr
+   Resources|Growing Stock|absolute|Other Planted Forest \tab Mm3 \tab Absolute growing stock in other planted forest (gdx with that pool) \cr
 }
 }
 
